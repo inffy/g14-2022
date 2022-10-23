@@ -1,8 +1,8 @@
 # Forked from https://gitlab.com/marcaux/asus-g14-2022
 
-## status suspend
+## suspend
 
-### s0ix
+### s0ix / s2idle / "modern standby"
 
 ### Fedora
 - Works with the patched asus-kernel from https://copr.fedorainfracloud.org/coprs/lukenukem/asus-kernel/
