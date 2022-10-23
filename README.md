@@ -8,7 +8,7 @@
 - Works with the patched asus-kernel from https://copr.fedorainfracloud.org/coprs/lukenukem/asus-kernel/
 - Or you can use 6.1 (currently in rc) mainline kernel where all the patches are included
 
-### Arch
+#### Arch
 - Use the linux-g14 kernel from the G14 repo: https://asus-linux.org/wiki/arch-guide/#repo
 - Or use the linux-mainline 6.1 (currently rc) from AUR: https://aur.archlinux.org/packages/linux-mainline
 
