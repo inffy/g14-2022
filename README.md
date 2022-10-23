@@ -2,7 +2,7 @@
 
 ## suspend
 
-### s0ix / s2idle / "modern standby"
+### s0ix / s2idle / "modern standby":
 
 ### Fedora
 - Works with the patched asus-kernel from https://copr.fedorainfracloud.org/coprs/lukenukem/asus-kernel/
