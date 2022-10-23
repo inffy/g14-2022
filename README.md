@@ -1,15 +1,20 @@
-# GA402R on Fedora 36 (Silverblue)
+# Forked from https://gitlab.com/marcaux/asus-g14-2022
 
 ## status suspend
 
 ### s0ix
 
-- parts of the speaker do not come back on resume
-- fans are dead after resume
+## Fedora
+- Works with the patched asus-kernel from https://copr.fedorainfracloud.org/coprs/lukenukem/asus-kernel/
+- Or you can use 6.1 (currently in rc) mainline kernel where all the patches are included
+
+## Arch
+- Use the linux-g14 kernel from the G14 repo: https://asus-linux.org/wiki/arch-guide/#repo
+- Or use the linux-mainline 6.1 (currently rc) from AUR: https://aur.archlinux.org/packages/linux-mainline
 
 ### S3
 
-- does not resume on 5.20-rc0
+You don't really need this anymore as s0ix is currently working fine and effect on the battery is almost identical
 
 ## S3 enablement
 By default the system uses s0ix to suspend (modern standby).<br>
@@ -22,15 +27,7 @@ As S3 is just commented out (like on the GA401Q) it is easy to enable it with th
 
 https://gitlab.com/marcaux/g14-2021-s3-dsdt
 
-## newer amdgpu firmware
-`linux-firmware-20220808-136.4.fc36.noarch`
 
-As of today (2022-08-08) Fedora hasn't received the latest amdgpu firmware, yet (https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/commit/).
-
-It includes the newest yellow carp patches:
-https://lore.kernel.org/linux-firmware/MN0PR12MB61010F6FCCB0262CAD3BF7CAE29E9@MN0PR12MB6101.namprd12.prod.outlook.com/T/#u
-
-You can install this package to get the newest version until a new linux-firmware package lands in Fedora. It should then automatically update again.
 
 ## scripts and quirks
 - `sudo ./install` to install
