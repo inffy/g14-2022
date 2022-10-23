@@ -1,0 +1,11 @@
+#!/bin/bash
+if [ "$EUID" -ne 0 ]
+  then echo "Please run as root"
+  exit
+fi
+
+systemctl disable --now autopm
+cp etc/systemd/system/* /etc/systemd/system/
+cp usr/local/bin/* /usr/local/bin/
+systemctl enable --now autopm
+systemctl enable upower_restart

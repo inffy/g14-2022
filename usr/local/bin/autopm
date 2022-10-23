@@ -1,0 +1,234 @@
+#!/bin/bash
+# integrated/dedicated GPU number
+# either card1 or card0
+# ! IMPORTANT - an automated way has to be found
+# the order of those identifiers is not always the same
+# therefore GPU_PM_ALLOWED should be disabled for now
+IGPU=card1
+DGPU=card0
+
+# allow the change of power_dpm_force_performance_level
+# as of 5.18.13 "cat /sys/class/drm/card0/device/power_dpm_force_performance_level" wakes the dGPU up all the time so let's keep it disabled
+GPU_PM_ALLOWED=0
+
+# One might want to have this 0 if another thing controls boost
+# There is a GNOME Shell extension where one can switch boost
+#    on / off for example
+CHANGE_BOOST_ALLOWED=0
+
+# One might not want to have ryzenadj values changed
+# Silverblue users for example can't install it globally atm
+# perhaps an adjustable path would be solution (?)
+RYZENADJ_ALLOWED=0
+
+# Power-Saver profile
+PS_A=7000                              # Sustained Power Limit (mW)
+PS_B=7000                              # ACTUAL Power Limit    (mW)
+PS_C=7000                              # Average Power Limit   (mW)
+PS_K=90000                              # VRM EDC Current       (mA)
+PS_F=85                                 # Max Tctl              (C)
+PS_GOVERNOR=powersave                # conservative ondemand userspace powersave performance schedutil
+PS_BOOSTCLOCK=0                         # enable CPU boost clocks (set 1 for on, 0 for off)
+
+# Balanced profile
+B_A=35000
+B_B=35000
+B_C=35000
+B_K=95000
+B_F=95
+B_GOVERNOR=schedutil
+B_BOOSTCLOCK=1
+
+# Performance profile
+P_A=45000
+P_B=45000
+P_C=45000
+P_K=100000
+P_F=100
+P_GOVERNOR=performance
+P_BOOSTCLOCK=1
+
+# Setting variables and function(s)
+# echo "auto" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+# echo "auto" > /sys/class/drm/$DGPU/device/power_dpm_force_performance_level
+
+# loop
+while :
+do
+  POWERPROFILE=$(powerprofilesctl get)
+  
+  CPU_GOV=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+  
+  AC_STATUS=$(cat /sys/class/power_supply/AC0/online)
+  BAT_STATUS=$(cat /sys/class/power_supply/BAT0/status)
+    
+  # busy percent currently sometimes not working on the 680M
+  # neet to look at it later...
+  # IGPU_BUSY_LEVEL=$((cat /sys/class/drm/$IGPU/device/gpu_busy_percent))
+
+  case $POWERPROFILE in
+    power-saver)
+      if [[ $RYZENADJ_ALLOWED == 1 ]]
+      then
+        ryzenadj -a $PS_A -b $PS_B -c $PS_C -k $PS_K -f $PS_F
+      fi
+      
+      # first checking AC because the discharging state can still be there for a while
+      # and is not accurate.
+      if [[ $AC_STATUS == 1 ]]
+      then
+        if [[ $CPU_GOV != $B_GOVERNOR ]]
+        then
+          echo "power saver profile and AC connected while being on $CPU_GOV, changing to $B_GOVERNOR"
+          echo $B_GOVERNOR | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+        fi
+      else
+        # AC is disconnected and battery discharges?
+        if [[ $BAT_STATUS == Discharging ]]
+        then
+          if [[ $CPU_GOV != $PS_GOVERNOR ]]
+          then
+            echo "power saver profile and battery is discharging on $CPU_GOV, changing to $PS_GOVERNOR"
+            echo $PS_GOVERNOR | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+          fi
+        #else
+        #  echo "battery is NOT discharging (but also not connected) on $CPU_GOV, changing to $B_GOVERNOR"
+        #  echo $B_GOVERNOR | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+        fi
+      fi
+      
+      # echo 17935000 | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+      
+      if [[ $CHANGE_BOOST_ALLOWED == 1 ]]
+      then
+        CPU_BOOST=$(cat /sys/devices/system/cpu/cpufreq/boost)
+        if [[ $PS_BOOSTCLOCK == 1 ]]
+        then
+          if [[ $CPU_BOOST != 1 ]]
+          then
+            echo "power saver profile, setting CPU boost to 1 (was $CPU_BOOST) as it is forced to do so in the autopm script"
+            echo 1 > /sys/devices/system/cpu/cpufreq/boost
+          fi
+        elif [[ $CPU_BOOST != 0 ]]
+        then
+          echo "power saver profile, setting CPU boost to 0 (was $CPU_BOOST) as it is forced to do so in the autopm script"
+          echo 0 > /sys/devices/system/cpu/cpufreq/boost
+        fi
+      fi
+
+      if [[ $GPU_PM_ALLOWED == 1 ]]
+      then
+        DGPU_STATUS=$(cat /sys/class/drm/$DGPU/device/power/runtime_status)
+        IGPU_POWER_LEVEL=$(cat /sys/class/drm/$IGPU/device/power_dpm_force_performance_level)
+        
+        if [[ $DGPU_STATUS == active ]]
+        then
+          if [[ $IGPU_POWER_LEVEL != auto ]]
+          then
+            echo "power saver profile and dGPU active, set iGPU power level to auto (was $IGPU_POWER_LEVEL)"
+            echo "auto" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+          fi
+        else
+          if [[ $AC_STATUS != 1 ]]
+          then
+            if [[ $IGPU_POWER_LEVEL != low ]]
+            then
+              echo "power saver profile, dGPU not active and AC is not connected, set iGPU power level to low (was $IGPU_POWER_LEVEL)"
+              echo "low" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+            fi
+          elif [[ $IGPU_POWER_LEVEL != auto ]]
+          then
+            echo "power saver profile, dGPU not active and AC is connected, set iGPU power level to auto (was $IGPU_POWER_LEVEL)"
+            echo "auto" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+          fi
+        fi
+      fi
+    ;;
+
+    balanced)
+      if [[ $RYZENADJ_ALLOWED == 1 ]]
+      then
+        ryzenadj -a $B_A -b $B_B -c $B_C -k $B_K -f $B_F
+      fi
+
+      if [[ $CPU_GOV != $B_GOVERNOR ]]
+      then
+        echo "balanced profile on $CPU_GOV, changing to $B_GOVERNOR"
+        echo $B_GOVERNOR | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      fi
+      
+      # echo 4935000 | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+      
+      if [[ $CHANGE_BOOST_ALLOWED == 1 ]]
+      then
+        CPU_BOOST=$(cat /sys/devices/system/cpu/cpufreq/boost)
+        if [[ $B_BOOSTCLOCK == 1 ]]
+        then
+          if [[ $CPU_BOOST != 1 ]]
+          then
+            echo "setting CPU boost to 1 (was $CPU_BOOST)"
+            echo 1 > /sys/devices/system/cpu/cpufreq/boost
+          fi
+        elif [[ $CPU_BOOST != 0 ]]
+        then
+          echo "setting CPU boost to 0 (was $CPU_BOOST)"
+          echo 0 > /sys/devices/system/cpu/cpufreq/boost
+        fi
+      fi
+      
+      if [[ $GPU_PM_ALLOWED == 1 ]]
+      then
+        IGPU_POWER_LEVEL=$(cat /sys/class/drm/$IGPU/device/power_dpm_force_performance_level)
+        if [[ $IGPU_POWER_LEVEL != auto ]]
+        then
+          echo "balanced profile, set iGPU power level to auto (was $IGPU_POWER_LEVEL)"
+          echo "auto" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+        fi
+      fi
+    ;;
+
+    performance)
+      if [[ $RYZENADJ_ALLOWED == 1 ]]
+      then
+        ryzenadj -a $P_A -b $P_B -c $P_C -k $P_K -f $P_F
+      fi
+      
+      if [[ $CPU_GOV != $P_GOVERNOR ]]
+      then
+        echo "performance profile on $CPU_GOV, changing to $P_GOVERNOR"
+        echo $P_GOVERNOR | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+      fi
+      
+      # echo 4935000 | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq
+      
+      if [[ $CHANGE_BOOST_ALLOWED == 1 ]]
+      then
+        CPU_BOOST=$(cat /sys/devices/system/cpu/cpufreq/boost)
+        if [[ $P_BOOSTCLOCK == 1 ]]
+        then
+          if [[ $CPU_BOOST != 1 ]]
+          then
+            echo "setting CPU boost to 1 (was $CPU_BOOST)"
+            echo 1 > /sys/devices/system/cpu/cpufreq/boost
+          fi
+        elif [[ $CPU_BOOST != 0 ]]
+        then
+          echo "setting CPU boost to 0 (was $CPU_BOOST)"
+          echo 0 > /sys/devices/system/cpu/cpufreq/boost
+        fi
+      fi
+      
+      if [[ $GPU_PM_ALLOWED == 1 ]]
+      then
+        IGPU_POWER_LEVEL=$(cat /sys/class/drm/$IGPU/device/power_dpm_force_performance_level)
+        if [[ $IGPU_POWER_LEVEL != auto ]]
+        then
+          echo "performance profile, set iGPU power level to auto (was $IGPU_POWER_LEVEL)"
+          echo "auto" > /sys/class/drm/$IGPU/device/power_dpm_force_performance_level
+        fi
+      fi
+    ;;
+  esac
+  
+  sleep 10
+done

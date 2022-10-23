@@ -1,0 +1,11 @@
+[Unit]
+Description=auto power management
+Before=graphical.target
+
+[Service]
+User=root
+Type=simple
+ExecStart=/usr/local/bin/autopm
+
+[Install]
+WantedBy=graphical.target

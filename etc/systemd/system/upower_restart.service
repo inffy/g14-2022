@@ -1,0 +1,11 @@
+[Unit]
+Description=ASUS G14 restart UPower
+After=suspend.target
+
+[Service]
+User=root
+Type=simple
+ExecStart=systemctl restart upower
+
+[Install]
+WantedBy=suspend.target
