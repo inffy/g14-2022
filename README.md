@@ -4,7 +4,7 @@
 
 ### s0ix / s2idle / "modern standby":
 
-### Fedora
+#### Fedora
 - Works with the patched asus-kernel from https://copr.fedorainfracloud.org/coprs/lukenukem/asus-kernel/
 - Or you can use 6.1 (currently in rc) mainline kernel where all the patches are included
 
